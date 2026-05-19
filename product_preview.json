@@ -1,0 +1,47 @@
+[
+  {
+    "id": "PROD_0001",
+    "name": "Zumo de Frutas {} Edición Limitada",
+    "brand": "Lays",
+    "category": "Alimentación",
+    "subcategory": "Snacks dulces",
+    "price": "15€",
+    "related_count": 6
+  },
+  {
+    "id": "PROD_0002",
+    "name": "Refresco {} {} Edición Limitada",
+    "brand": "Lays",
+    "category": "Alimentación",
+    "subcategory": "Pastas y arroces",
+    "price": "46€",
+    "related_count": 6
+  },
+  {
+    "id": "PROD_0003",
+    "name": "Arroz {} kg Premium",
+    "brand": "Doritos",
+    "category": "Alimentación",
+    "subcategory": "Snacks dulces",
+    "price": "23€",
+    "related_count": 6
+  },
+  {
+    "id": "PROD_0004",
+    "name": "Barrita de Cereal {} Ecológico",
+    "brand": "La Piara",
+    "category": "Alimentación",
+    "subcategory": "Snacks salados",
+    "price": "6.00€",
+    "related_count": 6
+  },
+  {
+    "id": "PROD_0005",
+    "name": "Galletas {} {} Familiar",
+    "brand": "Nocilla",
+    "category": "Alimentación",
+    "subcategory": "Chocolates",
+    "price": "35€",
+    "related_count": 6
+  }
+]
