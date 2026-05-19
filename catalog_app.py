@@ -1,7 +1,8 @@
 """
-📱 Catálogo de Productos Similares — App estilo tienda
+📱 SimilariFinder — Versión Móvil
 
-Arranca con: streamlit run catalog_app.py
+App tipo tienda/catálogo con productos relacionados.
+Diseñada para verse bien en móvil.
 """
 
 import hashlib
@@ -15,19 +16,12 @@ import numpy as np
 import streamlit as st
 from sentence_transformers import SentenceTransformer
 
-# ─── CONFIG ──────────────────────────────────────────────────────────────────
-
 DATA_DIR = Path(__file__).parent
 DATA_FILE = DATA_DIR / "product_data.pkl"
 
-st.set_page_config(
-    page_title="SimilariFinder — Encuentra productos relacionados",
-    page_icon="🔍",
-    layout="wide",
-    initial_sidebar_state="collapsed",
-)
+st.set_page_config(page_title="SimilariFinder", page_icon="🔍", layout="centered")
 
-# ─── CARGAR DATOS ────────────────────────────────────────────────────────────
+# ─── DATA ────────────────────────────────────────────────────────────────────
 
 @st.cache_resource
 def load_model():
@@ -39,6 +33,21 @@ def load_data():
         data = pickle.load(f)
     return data['products'], data['embeddings']
 
+def get_product_by_id(pid, products):
+    for p in products:
+        if p["id"] == pid:
+            return p
+    return None
+
+def search_similar(query_emb, all_embeddings, products, top_k=24):
+    if len(query_emb.shape) == 1:
+        query_emb = query_emb.reshape(1, -1)
+    q_norm = query_emb / np.linalg.norm(query_emb)
+    e_norm = all_embeddings / np.linalg.norm(all_embeddings, axis=1, keepdims=True)
+    scores = np.dot(e_norm, q_norm.T).flatten()
+    top_indices = np.argsort(scores)[::-1][:top_k]
+    return [{**products[i], 'score': float(scores[i])} for i in top_indices]
+
 # ─── HELPERS ─────────────────────────────────────────────────────────────────
 
 def hash_color(text):
@@ -48,567 +57,346 @@ def hash_color(text):
     b = ((h >> 16) & 0xFF) % 180 + 75
     return f"rgb({r},{g},{b})"
 
-def get_product_by_id(pid, products):
-    for p in products:
-        if p["id"] == pid:
-            return p
-    return None
+STOCK_EMOJI = {"En stock": "✅", "Pocas unidades": "⚠️", "Agotado": "❌"}
 
-def search_similar(query_emb, all_embeddings, products, top_k=20):
-    if len(query_emb.shape) == 1:
-        query_emb = query_emb.reshape(1, -1)
-    q_norm = query_emb / np.linalg.norm(query_emb)
-    e_norm = all_embeddings / np.linalg.norm(all_embeddings, axis=1, keepdims=True)
-    scores = np.dot(e_norm, q_norm.T).flatten()
-    top_indices = np.argsort(scores)[::-1][:top_k]
-    results = []
-    for idx in top_indices:
-        results.append({**products[idx], 'score': float(scores[idx])})
-    return results
+# ─── CSS MOBILE-FIRST ────────────────────────────────────────────────────────
 
-# ─── CSS ─────────────────────────────────────────────────────────────────────
-
-CUSTOM_CSS = """
+CSS = """
 <style>
-    .stApp { background: #f4f6f9; }
+    /* Reset */
+    * { box-sizing: border-box; }
+    .stApp { background: #f5f5f5; padding: 0 !important; }
+    .block-container { padding: 8px 12px !important; max-width: 480px !important; }
 
-    /* Top Bar */
-    .top-bar {
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-        padding: 16px 24px;
-        border-radius: 16px;
-        margin-bottom: 24px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        color: white;
+    /* Barra superior */
+    .bar {
+        background: linear-gradient(135deg, #1a1a2e, #0f3460);
+        color: white; padding: 14px 16px; border-radius: 14px;
+        margin-bottom: 12px;
     }
-    .top-bar h1 { margin: 0; font-size: 1.4rem; color: white; }
-    .top-bar span { font-size: 0.85rem; opacity: 0.8; }
+    .bar h1 { font-size: 18px; margin: 0; color: white; }
+    .bar p { font-size: 12px; margin: 2px 0 0; opacity: .7; color: white; }
+    .bar-sm { padding: 10px 14px; }
+    .bar-sm h1 { font-size: 15px; }
 
-    /* Category Cards */
-    .cat-card {
-        background: white;
-        border-radius: 16px;
-        padding: 24px 16px;
-        text-align: center;
-        cursor: pointer;
-        box-shadow: 0 2px 12px rgba(0,0,0,0.05);
-        transition: all 0.2s;
-        border: 2px solid transparent;
-    }
-    .cat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
-    .cat-card .icon { font-size: 36px; margin-bottom: 8px; }
-    .cat-card .title { font-size: 14px; font-weight: 600; color: #333; }
-    .cat-card .count { font-size: 12px; color: #999; }
-
-    /* Product Card */
-    .prod-card {
-        background: white;
-        border-radius: 16px;
-        overflow: hidden;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
-        transition: all 0.2s;
-        height: 100%;
-        cursor: pointer;
-    }
-    .prod-card:hover { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
-    .prod-card .color-bar { height: 80px; display: flex; align-items: center; justify-content: center; font-size: 40px; }
-    .prod-card .info { padding: 14px; }
-    .prod-card .brand { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
-    .prod-card .name { font-size: 14px; font-weight: 600; color: #222; margin: 4px 0; line-height: 1.3; min-height: 36px; }
-    .prod-card .price { font-size: 17px; font-weight: 700; color: #0f3460; }
-    .prod-card .rating { font-size: 12px; color: #888; }
-    .prod-card .badge {
-        display: inline-block; font-size: 10px; padding: 2px 8px;
-        border-radius: 20px; background: #e8f0fe; color: #1a73e8; margin-top: 6px;
-    }
-
-    /* Product Detail */
-    .detail-header {
-        background: white;
-        border-radius: 20px;
-        padding: 32px;
-        margin-bottom: 24px;
-        box-shadow: 0 2px 12px rgba(0,0,0,0.05);
-    }
-    .detail-header .icon-big { font-size: 64px; margin-bottom: 12px; }
-    .detail-features { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
-    .detail-features span {
-        background: #e8f0fe; color: #1a73e8; font-size: 12px;
-        padding: 4px 12px; border-radius: 20px;
-    }
-    .detail-tags { display: flex; flex-wrap: wrap; gap: 6px; }
-    .detail-tags span {
-        background: #f0f0f0; color: #666; font-size: 11px;
-        padding: 3px 10px; border-radius: 12px;
-    }
-
-    /* Related Section */
-    .related-section {
-        margin-top: 24px;
-    }
-    .related-section h2 {
-        font-size: 1.3rem; font-weight: 600; margin-bottom: 16px;
-    }
-
-    /* Buttons */
-    .stButton > button {
-        border-radius: 30px; font-weight: 500;
-    }
-    .back-btn > button {
-        background: transparent; border: 1px solid #ddd; color: #555;
-    }
-    .back-btn > button:hover { border-color: #1a73e8; color: #1a73e8; }
-
-    /* Search */
-    .stTextInput > div > div > input {
-        border-radius: 30px; padding: 12px 20px; font-size: 16px;
-        border: 2px solid #e0e0e0;
-    }
-    .stTextInput > div > div > input:focus {
-        border-color: #0f3460; box-shadow: 0 0 0 3px rgba(15,52,96,0.1);
-    }
+    /* Buscador */
+    .stTextInput>div>div>input { border-radius: 30px !important; padding: 10px 16px !important; font-size: 14px !important; border: 1px solid #ddd !important; }
+    .stButton>button { border-radius: 30px !important; font-size: 13px !important; padding: 6px 16px !important; }
 
     /* Breadcrumb */
-    .breadcrumb {
-        font-size: 13px; color: #888; margin-bottom: 16px;
-    }
-    .breadcrumb a { color: #1a73e8; cursor: pointer; text-decoration: none; }
-    .breadcrumb a:hover { text-decoration: underline; }
+    .bc { font-size: 12px; color: #888; margin-bottom: 8px; }
+    .bc a { color: #1a73e8; text-decoration: none; }
 
-    /* Badge stock */
-    .stock-badge {
-        display: inline-block; font-size: 12px; font-weight: 500;
-        padding: 3px 10px; border-radius: 20px;
+    /* Grilla de categorías */
+    .cg { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .c {
+        background: white; border-radius: 14px; padding: 12px;
+        text-align: center; flex: 1 0 calc(33% - 8px); min-width: 90px;
+        box-shadow: 0 1px 4px rgba(0,0,0,.05); cursor: pointer;
     }
-    .stock-badge.in { background: #e6f4ea; color: #1e7e34; }
-    .stock-badge.low { background: #fef7e0; color: #e37400; }
-    .stock-badge.out { background: #fce8e6; color: #c5221f; }
+    .c .ci { font-size: 24px; }
+    .c .cn { font-size: 12px; font-weight: 600; margin-top: 4px; color: #333; }
+    .c .cc { font-size: 10px; color: #999; }
 
-    /* Related card */
-    .rel-card {
-        background: white;
-        border-radius: 14px;
-        overflow: hidden;
-        box-shadow: 0 1px 6px rgba(0,0,0,0.06);
-        transition: all 0.2s;
-        height: 100%;
-        cursor: pointer;
+    /* Producto card (horizontal en home) */
+    .pc {
+        background: white; border-radius: 12px; padding: 10px;
+        margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.04);
+        display: flex; gap: 10px; align-items: center; cursor: pointer;
     }
-    .rel-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
-    .rel-card .color-bar { height: 60px; display: flex; align-items: center; justify-content: center; font-size: 28px; }
-    .rel-card .info { padding: 10px 12px; }
-    .rel-card .brand { font-size: 10px; color: #888; text-transform: uppercase; }
-    .rel-card .name { font-size: 12px; font-weight: 600; margin: 2px 0; line-height: 1.2; }
-    .rel-card .price { font-size: 14px; font-weight: 700; color: #0f3460; }
+    .pc .pb {
+        width: 48px; height: 48px; border-radius: 12px; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center; font-size: 22px;
+    }
+    .pc .pi { flex: 1; min-width: 0; }
+    .pc .pbrand { font-size: 10px; color: #999; text-transform: uppercase; }
+    .pc .pname { font-size: 13px; font-weight: 600; color: #222; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pc .pprice { font-size: 15px; font-weight: 700; color: #0f3460; }
+
+    /* Producto card (relacionados, aún más pequeño) */
+    .prc {
+        background: white; border-radius: 10px; padding: 8px;
+        margin-bottom: 6px; display: flex; gap: 8px; align-items: center; cursor: pointer;
+        box-shadow: 0 1px 2px rgba(0,0,0,.03);
+    }
+    .prc .prb { width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+    .prc .prname { font-size: 12px; font-weight: 600; flex: 1; color: #222; }
+    .prc .prprice { font-size: 13px; font-weight: 700; color: #0f3460; }
+
+    /* Detalle producto */
+    .dt {
+        background: white; border-radius: 16px; padding: 20px;
+        box-shadow: 0 1px 4px rgba(0,0,0,.04); margin-bottom: 16px;
+    }
+    .dt .dticon {
+        width: 72px; height: 72px; border-radius: 16px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 36px; margin-bottom: 12px;
+    }
+    .dt .dtbrand { font-size: 11px; color: #999; text-transform: uppercase; }
+    .dt .dtname { font-size: 18px; font-weight: 700; color: #222; margin: 2px 0 4px; }
+    .dt .dtprice { font-size: 24px; font-weight: 800; color: #0f3460; }
+    .dt .dtrating { font-size: 12px; color: #888; margin-bottom: 6px; }
+    .dt .dtdesc { font-size: 13px; color: #555; line-height: 1.5; margin: 8px 0; }
+    .dt .dtfeat { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
+    .dt .dtfeat span { background: #e8f0fe; color: #1a73e8; font-size: 11px; padding: 3px 10px; border-radius: 12px; }
+    .dt .dttags { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
+    .dt .dttags span { background: #f0f0f0; color: #666; font-size: 10px; padding: 2px 8px; border-radius: 10px; }
+    .dt .dtstock { font-size: 13px; margin-top: 4px; }
+
+    /* Sección relacionados */
+    .rs h2 { font-size: 16px; font-weight: 700; margin: 16px 0 8px; color: #222; }
+    .rs p { font-size: 12px; color: #999; margin: 0 0 8px; }
+
+    /* Sugerencias rápidas */
+    .sg { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 12px; }
+    .sg .sgbtn {
+        background: white; border: 1px solid #e0e0e0; border-radius: 20px;
+        padding: 5px 12px; font-size: 12px; cursor: pointer; color: #555;
+    }
 </style>
 """
 
-# ─── UI COMPONENTS ───────────────────────────────────────────────────────────
-
-def product_card_html(p, size="small"):
-    """Generate HTML for a product card."""
-    icon = p.get("icon", "📦")
+def show_product_card(p, key_prefix=""):
+    """Render a horizontal product card."""
     color = hash_color(p["name"])
-    rating_stars = "⭐" * int(p.get("rating", 0) // 1) + "☆" * (5 - int(p.get("rating", 0) // 1))
-    stock_class = {"En stock": "in", "Pocas unidades": "low", "Agotado": "out"}.get(p["stock"], "in")
+    icon = p.get("icon", "📦")
+    k = f"{key_prefix}{p['id']}"
 
-    badge = ""
-    if "novedad" in p.get("tags", []):
-        badge = '<span class="badge">✨ Novedad</span>'
-    elif "oferta" in p.get("tags", []):
-        badge = '<span class="badge">🔥 Oferta</span>'
-
-    if size == "large":
-        return f"""
-        <div class="prod-card" onclick="window.location.href='?p={p['id']}'">
-            <div class="color-bar" style="background:{color};">{icon}</div>
-            <div class="info">
-                <div class="brand">{p['brand']} · {p['category']}</div>
-                <div class="name">{p['name'][:70]}</div>
-                <div style="display:flex;justify-content:space-between;align-items:center;">
-                    <span class="price">{p['price']}</span>
-                    <span class="rating">{rating_stars} ({p.get('reviews',0)})</span>
-                </div>
-                <span class="stock-badge {stock_class}">{p['stock']}</span>
-                {badge}
-            </div>
+    st.markdown(f"""
+    <div class="pc" onclick="document.getElementById('{k}').click()">
+        <div class="pb" style="background:{color};">{icon}</div>
+        <div class="pi">
+            <div class="pbrand">{p['brand']} · {p['category']}</div>
+            <div class="pname">{p['name'][:60]}</div>
         </div>
-        """
-    else:
-        return f"""
-        <div class="rel-card" onclick="window.location.href='?p={p['id']}'">
-            <div class="color-bar" style="background:{color};">{icon}</div>
-            <div class="info">
-                <div class="brand">{p['brand']}</div>
-                <div class="name">{p['name'][:60]}</div>
-                <div style="display:flex;justify-content:space-between;align-items:center;">
-                    <span class="price">{p['price']}</span>
-                    <span class="rating">{rating_stars[:3]}</span>
-                </div>
-            </div>
-        </div>
-        """
+        <div class="pprice">{p['price']}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
+    # Hidden button to handle click via session state
+    if st.button(f"Ver {p['name'][:30]}", key=k, use_container_width=True):
+        st.session_state["selected_product"] = p["id"]
+        st.session_state["page"] = "product"
+        st.rerun()
+
+def show_related_card(p, key_prefix=""):
+    """Smaller card for related products section."""
+    color = hash_color(p["name"])
+    icon = p.get("icon", "📦")
+    k = f"{key_prefix}rel_{p['id']}"
+
+    st.markdown(f"""
+    <div class="prc" onclick="document.getElementById('{k}').click()">
+        <div class="prb" style="background:{color};">{icon}</div>
+        <div class="prname">{p['name'][:50]}</div>
+        <div class="prprice">{p['price']}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    if st.button(f"Rel {p['name'][:25]}", key=k, use_container_width=True):
+        st.session_state["selected_product"] = p["id"]
+        st.session_state["page"] = "product"
+        st.rerun()
 
 # ─── PAGES ───────────────────────────────────────────────────────────────────
 
-def show_category_landing(products, model, all_embeddings):
-    """Show main page with category grid and search."""
-    st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+def page_home(products, model, embeddings):
+    st.markdown(CSS, unsafe_allow_html=True)
 
-    # Top bar
-    st.markdown("""
-    <div class="top-bar">
-        <div>
-            <h1>🔍 SimilariFinder</h1>
-            <span>Encuentra productos relacionados — busca, navega, descubre</span>
-        </div>
-        <div style="font-size: 13px; opacity: 0.7;">
-            {} productos · 10 categorías
-        </div>
-    </div>
-    """.format(len(products)), unsafe_allow_html=True)
+    # Barra
+    st.markdown(f'<div class="bar"><h1>🔍 SimilariFinder</h1><p>{len(products)} productos · Encuentra relacionados</p></div>', unsafe_allow_html=True)
 
-    # ─── Search ─────────────────────────────────────────────────────────────
-    col1, col2 = st.columns([4, 1])
-    with col1:
-        query = st.text_input("", placeholder="🔎 Busca productos, marcas, categorías...",
-                              label_visibility="collapsed", key="main_search")
-    with col2:
-        search_click = st.button("Buscar", type="primary", use_container_width=True)
+    # Buscador
+    query = st.text_input("", placeholder="🔎 Busca productos, marcas...", label_visibility="collapsed")
+    if query:
+        q_emb = model.encode(query)
+        results = search_similar(q_emb, embeddings, products)
+        st.session_state["results"] = results
+        st.session_state["q"] = query
+        st.session_state["page"] = "search"
+        st.rerun()
 
-    if search_click and query:
-        with st.spinner("Buscando..."):
-            q_emb = model.encode(query)
-            results = search_similar(q_emb, all_embeddings, products, top_k=30)
-            st.session_state["search_results"] = results
-            st.session_state["search_query"] = query
-            st.session_state["page"] = "search"
-            st.rerun()
-
-    # ─── Quick suggestions ──────────────────────────────────────────────────
-    suggestions = ["🥔 Patatas fritas", "📖 Novela policíaca", "🎧 Auriculares",
-                   "☕ Cafetera", "👟 Zapatillas", "🎸 Guitarra"]
-    cols = st.columns(len(suggestions))
-    for i, sug in enumerate(suggestions):
-        with cols[i]:
-            if st.button(sug, key=f"qs_{i}", use_container_width=True, type="secondary"):
-                q_emb = model.encode(sug.split(" ", 1)[1])
-                results = search_similar(q_emb, all_embeddings, products, top_k=30)
-                st.session_state["search_results"] = results
-                st.session_state["search_query"] = sug
+    # Sugerencias
+    sugs = ["🥔 Patatas", "📖 Libros", "🎧 Auriculares", "☕ Café", "👟 Zapatillas", "🎸 Guitarra"]
+    cols = st.columns(3)
+    for i, s in enumerate(sugs):
+        with cols[i % 3]:
+            if st.button(s, key=f"s{i}", use_container_width=True):
+                q_emb = model.encode(s.split(" ", 1)[1])
+                results = search_similar(q_emb, embeddings, products)
+                st.session_state["results"] = results
+                st.session_state["q"] = s
                 st.session_state["page"] = "search"
                 st.rerun()
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown('<div class="cg">', unsafe_allow_html=True)
 
-    # ─── Category grid ──────────────────────────────────────────────────────
-    st.markdown("### 🏪 Explora por categorías")
-
-    # Load categories from products
-    from collections import Counter
-    cat_counter = Counter(p["category"] for p in products)
+    # Categorías
+    cats = list(dict.fromkeys(p["category"] for p in products))
     icons = {}
     for p in products:
         if p["category"] not in icons:
             icons[p["category"]] = p.get("icon", "📦")
+    counts = Counter(p["category"] for p in products)
 
-    categories = sorted(cat_counter.keys())
-    cols_per_row = 5
-    for i in range(0, len(categories), cols_per_row):
-        row_cats = categories[i:i + cols_per_row]
-        cols = st.columns(cols_per_row)
-        for j, cat in enumerate(row_cats):
-            with cols[j]:
-                icon = icons.get(cat, "📦")
-                count = cat_counter[cat]
-                bg = hash_color(cat)
-                st.markdown(f"""
-                <div class="cat-card" style="border-color: {bg};">
-                    <div class="icon">{icon}</div>
-                    <div class="title">{cat}</div>
-                    <div class="count">{count} productos</div>
-                </div>
-                """, unsafe_allow_html=True)
-                if st.button("Ver", key=f"cat_{cat}", use_container_width=True):
-                    st.session_state["selected_category"] = cat
-                    st.session_state["page"] = "category"
-                    st.rerun()
+    for cat in cats:
+        icon = icons.get(cat, "📦")
+        count = counts[cat]
+        st.markdown(f'<div class="c"><div class="ci">{icon}</div><div class="cn">{cat}</div><div class="cc">{count}</div></div>', unsafe_allow_html=True)
+        if st.button(f"cat_{cat}", key=f"cat_{cat}"):
+            st.session_state["cat"] = cat
+            st.session_state["page"] = "category"
+            st.rerun()
 
-    # ─── Featured products (random selection) ───────────────────────────────
-    st.markdown("<br><h3>✨ Productos destacados</h3>", unsafe_allow_html=True)
-    featured = random.sample(products, min(12, len(products)))
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    cols = st.columns(4)
-    for i, p in enumerate(featured):
-        with cols[i % 4]:
-            st.markdown(product_card_html(p, size="large"), unsafe_allow_html=True)
-            if st.button(f"Ver {p['name'][:25]}...", key=f"fp_{p['id']}", use_container_width=True):
-                st.session_state["selected_product"] = p["id"]
-                st.session_state["page"] = "product"
-                st.rerun()
+    # Destacados
+    st.markdown("### ✨ Destacados")
+    featured = random.sample(products, min(10, len(products)))
+    for p in featured:
+        show_product_card(p, "fp_")
 
+def page_category(products, model, embeddings):
+    st.markdown(CSS, unsafe_allow_html=True)
+    cat = st.session_state.get("cat", products[0]["category"])
+    cat_prods = [p for p in products if p["category"] == cat]
+    icon = cat_prods[0].get("icon", "📦") if cat_prods else "📦"
 
-def show_category(products, model, all_embeddings):
-    """Show products filtered by category."""
-    st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+    if st.button("← Volver", use_container_width=True):
+        st.session_state["page"] = "home"
+        st.rerun()
 
-    cat = st.session_state.get("selected_category", products[0]["category"])
-    cat_products = [p for p in products if p["category"] == cat]
-    icon = cat_products[0].get("icon", "📦") if cat_products else "📦"
+    st.markdown(f'<div class="bar bar-sm"><h1>{icon} {cat}</h1><p>{len(cat_prods)} productos</p></div>', unsafe_allow_html=True)
 
-    # Back + breadcrumb
-    st.markdown(f"""
-    <div class="breadcrumb">
-        <a onclick="history.back()">← Inicio</a> / <b>{icon} {cat}</b>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown(f"""
-    <div class="top-bar">
-        <h1>{icon} {cat}</h1>
-        <span>{len(cat_products)} productos</span>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Search within category
-    query = st.text_input("", placeholder=f"🔎 Buscar en {cat}...",
-                          label_visibility="collapsed", key="cat_search")
-    search_cat = st.button("Buscar", key="search_cat_btn", use_container_width=True)
-
-    if search_cat and query:
+    query = st.text_input("", placeholder=f"🔎 Buscar en {cat}...", label_visibility="collapsed")
+    if query:
         q_emb = model.encode(query)
-        results = search_similar(q_emb, all_embeddings, cat_products, top_k=30)
-        st.session_state["search_results"] = results
-        st.session_state["search_query"] = query
+        results = search_similar(q_emb, embeddings, cat_prods)
+        st.session_state["results"] = results
+        st.session_state["q"] = query
         st.session_state["page"] = "search"
         st.rerun()
 
-    # Grid of products
-    st.markdown("<br>", unsafe_allow_html=True)
-    cols = st.columns(4)
-    for i, p in enumerate(cat_products):
-        with cols[i % 4]:
-            st.markdown(product_card_html(p, size="large"), unsafe_allow_html=True)
-            if st.button(f"Ver {p['name'][:25]}...", key=f"catp_{p['id']}", use_container_width=True):
-                st.session_state["selected_product"] = p["id"]
-                st.session_state["page"] = "product"
-                st.rerun()
+    for p in cat_prods:
+        show_product_card(p, "cp_")
 
-
-def show_product_detail(products, model, all_embeddings):
-    """Show full product detail with related products."""
-    st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
-
+def page_product(products, model, embeddings):
+    st.markdown(CSS, unsafe_allow_html=True)
     pid = st.session_state.get("selected_product", products[0]["id"])
     p = get_product_by_id(pid, products)
     if not p:
-        st.error("Producto no encontrado")
         st.session_state["page"] = "home"
         st.rerun()
         return
 
-    icon = p.get("icon", "📦")
     color = hash_color(p["name"])
-    rating_stars = "⭐" * int(p.get("rating", 0) // 1) + "☆" * (5 - int(p.get("rating", 0) // 1))
-    stock_class = {"En stock": "in", "Pocas unidades": "low", "Agotado": "out"}.get(p["stock"], "in")
+    icon = p.get("icon", "📦")
+    stars = "⭐" * int(p.get("rating", 0) // 1) + "☆" * (5 - int(p.get("rating", 0) // 1))
+    stock_emoji = STOCK_EMOJI.get(p["stock"], "")
 
-    # Breadcrumb + back
+    if st.button("← Volver", use_container_width=True):
+        st.session_state["page"] = "home"
+        st.rerun()
+
+    st.markdown(f'<div class="bc"><a onclick="history.back()">Inicio</a> / <b>{p["name"][:40]}</b></div>', unsafe_allow_html=True)
+
+    # Detalle del producto
+    feat_html = ""
+    if p.get("features"):
+        feat_html = '<div class="dtfeat">' + "".join(f"<span>✓ {f}</span>" for f in p["features"]) + "</div>"
+
+    tags_html = ""
+    if p.get("tags"):
+        tags_html = '<div class="dttags">' + "".join(f"<span>#{t}</span>" for t in p["tags"][:8]) + "</div>"
+
+    variants_html = ""
+    if p.get("variants"):
+        variants_html = f'<div style="font-size:12px;color:#888;margin-top:8px;">Formatos: {", ".join(p["variants"])}</div>'
+
     st.markdown(f"""
-    <div class="breadcrumb">
-        <a onclick="history.back()">← Inicio</a> / <a onclick="history.back()">{p['category']}</a> / <b>{p['name'][:50]}</b>
+    <div class="dt">
+        <div class="dticon" style="background:{color};">{icon}</div>
+        <div class="dtbrand">{p['brand']} · {p['subcategory']}</div>
+        <div class="dtname">{p['name']}</div>
+        <div class="dtrating">{stars} {p['rating']} ({p['reviews']:,})</div>
+        <div class="dtprice">{p['price']}</div>
+        <div class="dtstock">{stock_emoji} {p['stock']}</div>
+        <div class="dtdesc">{p['description']}</div>
+        {feat_html}
+        {tags_html}
+        {variants_html}
     </div>
     """, unsafe_allow_html=True)
 
-    back_cols = st.columns([1, 10])
-    with back_cols[0]:
-        if st.button("← Volver", use_container_width=True):
-            st.session_state["page"] = "home"
-            st.rerun()
+    # Productos relacionados
+    st.markdown('<div class="rs">', unsafe_allow_html=True)
+    st.markdown(f"## 🔗 Relacionados")
 
-    # ─── PRODUCT DETAIL ────────────────────────────────────────────────────
-    st.markdown(f"""
-    <div class="detail-header">
-        <table style="width:100%; border-collapse: collapse;">
-        <tr>
-            <td style="width:120px; text-align:center; vertical-align:top;">
-                <div style="width:100px;height:100px;background:{color};border-radius:20px;
-                    display:flex;align-items:center;justify-content:center;font-size:48px;
-                    margin: 0 auto;">
-                    {icon}
-                </div>
-            </td>
-            <td style="vertical-align:top; padding-left:24px;">
-                <div style="font-size:13px;color:#888;text-transform:uppercase;letter-spacing:0.5px;">
-                    {p['brand']} · {p['subcategory']}
-                </div>
-                <h1 style="font-size:1.5rem;margin:4px 0;color:#222;">{p['name']}</h1>
-                <div style="font-size:12px;color:#888;margin-bottom:8px;">
-                    {rating_stars} {p['rating']} ({p['reviews']:,} valoraciones)
-                </div>
-                <div style="font-size:28px;font-weight:700;color:#0f3460;">{p['price']}</div>
-                <div style="margin:8px 0;">
-                    <span class="stock-badge {stock_class}">{p['stock']}</span>
-                </div>
-                <p style="color:#555;line-height:1.5;margin:12px 0;">{p['description']}</p>
-    """, unsafe_allow_html=True)
-
-    # Features
-    if p.get("features"):
-        st.markdown('<div class="detail-features">', unsafe_allow_html=True)
-        for f in p["features"]:
-            st.markdown(f'<span>✓ {f}</span>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    # Tags
-    st.markdown('<div class="detail-tags">', unsafe_allow_html=True)
-    for t in p.get("tags", []):
-        st.markdown(f'<span>#{t}</span>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # Variants
-    if p.get("variants"):
-        st.markdown(f"""
-        <div style="margin-top:12px;font-size:13px;color:#888;">
-            Formatos disponibles: {', '.join(p['variants'])}
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("</td></tr></table></div>", unsafe_allow_html=True)
-
-    # ─── RELATED PRODUCTS SECTION ──────────────────────────────────────────
-    st.markdown("---")
-    st.markdown('<div class="related-section">', unsafe_allow_html=True)
-    st.markdown(f"## 🔗 Productos relacionados con {p['name'][:40]}")
-
-    # Collect related products
-    related_products = []
-    relation_labels = []
-
-    # 1. Explicit related_ids (predefined by relationships)
+    related = []
     for rid in p.get("related_ids", []):
         rp = get_product_by_id(rid, products)
         if rp and rp["id"] != p["id"]:
-            related_products.append(rp)
+            related.append(rp)
 
-    # 2. Semantic similarity (via embeddings)
-    if len(related_products) < 12:
+    if len(related) < 8:
         p_idx = products.index(p)
-        q_emb = all_embeddings[p_idx]
-        semantic = search_similar(q_emb, all_embeddings, products, top_k=15)
+        q_emb = embeddings[p_idx]
+        semantic = search_similar(q_emb, embeddings, products, top_k=12)
         for r in semantic:
-            if r["id"] != p["id"] and r not in related_products:
-                related_products.append(r)
-                if len(related_products) >= 16:
+            if r["id"] != p["id"] and r not in related:
+                related.append(r)
+                if len(related) >= 12:
                     break
 
-    # Remove self, limit to 16
-    related_products = [r for r in related_products if r["id"] != p["id"]][:16]
+    related = [r for r in related if r["id"] != p["id"]][:12]
 
-    # Display related products
-    if related_products:
-        st.markdown(f"<p style='color:#888;font-size:14px;'>{len(related_products)} productos relacionados</p>",
-                    unsafe_allow_html=True)
-
-        # Group into sections
-        cols = st.columns(4)
-        for i, rp in enumerate(related_products):
-            with cols[i % 4]:
-                st.markdown(product_card_html(rp, size="small"), unsafe_allow_html=True)
-                btn_key = f"rel_{i}_{rp['id']}"
-                if st.button(f"Ver", key=btn_key, use_container_width=True):
-                    st.session_state["selected_product"] = rp["id"]
-                    st.session_state["page"] = "product"
-                    st.rerun()
+    if related:
+        st.markdown(f"<p>{len(related)} productos similares</p>", unsafe_allow_html=True)
+        for r in related:
+            show_related_card(r, f"rp_{p['id']}_")
     else:
-        st.markdown("<p style='color:#888;'>No se encontraron productos relacionados.</p>",
-                    unsafe_allow_html=True)
+        st.markdown("<p style='color:#888;'>No se encontraron productos relacionados.</p>", unsafe_allow_html=True)
 
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
+def page_search(products, model, embeddings):
+    st.markdown(CSS, unsafe_allow_html=True)
+    results = st.session_state.get("results", [])
+    q = st.session_state.get("q", "")
 
-def show_search_results(products, model, all_embeddings):
-    """Show search results page."""
-    st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+    if st.button("← Volver", use_container_width=True):
+        st.session_state["page"] = "home"
+        st.rerun()
 
-    results = st.session_state.get("search_results", [])
-    query = st.session_state.get("search_query", "")
-
-    # Back
-    st.markdown(f"""
-    <div class="breadcrumb">
-        <a onclick="history.back()">← Inicio</a> / Resultados: "<b>{query[:50]}</b>"
-    </div>
-    """, unsafe_allow_html=True)
-
-    back_cols = st.columns([1, 10])
-    with back_cols[0]:
-        if st.button("← Volver", use_container_width=True):
-            st.session_state["page"] = "home"
-            st.rerun()
-
-    # Stats
-    cat_counts = Counter(r["category"] for r in results)
-    cats_str = " · ".join([f"**{k}** ({v})" for k, v in sorted(cat_counts.items(), key=lambda x: -x[1])[:5]])
-
-    st.markdown(f"""
-    <div class="top-bar" style="padding: 16px 20px;">
-        <div>
-            <h1 style="font-size:1.1rem;">🔍 Resultados para "{query[:60]}"</h1>
-            <span style="font-size:12px;">{len(results)} productos encontrados</span>
-        </div>
-        <div style="font-size:12px;opacity:0.8;">{cats_str}</div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(f'<div class="bar bar-sm"><h1>🔍 "{q[:50]}"</h1><p>{len(results)} resultados</p></div>', unsafe_allow_html=True)
 
     if not results:
-        st.markdown("<br><h3 style='text-align:center;color:#888;'>😕 No se encontraron resultados. Prueba con otra búsqueda.</h3>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center;color:#888;padding:40px 0;'>😕 No se encontraron resultados</p>", unsafe_allow_html=True)
         return
 
-    # Show results
-    cols = st.columns(4)
-    for i, r in enumerate(results):
-        with cols[i % 4]:
-            st.markdown(product_card_html(r, size="large"), unsafe_allow_html=True)
-            if st.button(f"Ver {r['name'][:25]}...", key=f"sr_{r['id']}", use_container_width=True):
-                st.session_state["selected_product"] = r["id"]
-                st.session_state["page"] = "product"
-                st.rerun()
-
+    for r in results:
+        show_product_card(r, "sr_")
 
 # ─── MAIN ────────────────────────────────────────────────────────────────────
 
 def main():
-    # Initialize session state
     if "page" not in st.session_state:
         st.session_state["page"] = "home"
 
-    # Load data
-    with st.spinner("📦 Cargando catálogo..."):
+    with st.spinner("Cargando..."):
         model = load_model()
-        products, all_embeddings = load_data()
+        products, embeddings = load_data()
 
-    # Route
     page = st.session_state["page"]
-
     if page == "home":
-        show_category_landing(products, model, all_embeddings)
+        page_home(products, model, embeddings)
     elif page == "category":
-        show_category(products, model, all_embeddings)
+        page_category(products, model, embeddings)
     elif page == "product":
-        show_product_detail(products, model, all_embeddings)
+        page_product(products, model, embeddings)
     elif page == "search":
-        show_search_results(products, model, all_embeddings)
-
-    # Footer
-    st.markdown("""
-    <div style="text-align:center;padding:32px 0 16px;color:#aaa;font-size:13px;">
-        🛠️ SimilariFinder · {cantidad} productos · Hecho por José Luis para Joaquín
-    </div>
-    """.format(cantidad=len(products)), unsafe_allow_html=True)
-
+        page_search(products, model, embeddings)
 
 if __name__ == "__main__":
     main()
