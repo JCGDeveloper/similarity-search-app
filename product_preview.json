@@ -1,47 +1,52 @@
 [
   {
     "id": "PROD_0001",
-    "name": "Zumo de Frutas {} Edición Limitada",
-    "brand": "Lays",
+    "name": "Gusanitos ColaCao Edición Limitada",
+    "brand": "ColaCao",
     "category": "Alimentación",
-    "subcategory": "Snacks dulces",
-    "price": "15€",
-    "related_count": 6
+    "subcategory": "Snacks salados",
+    "price": "2.00€",
+    "description": "El clásico que nunca falla, ideal para compartir con amigos.",
+    "related_count": 8
   },
   {
     "id": "PROD_0002",
-    "name": "Refresco {} {} Edición Limitada",
-    "brand": "Lays",
+    "name": "Galletas Grefusa Edición Limitada",
+    "brand": "Grefusa",
     "category": "Alimentación",
-    "subcategory": "Pastas y arroces",
-    "price": "46€",
-    "related_count": 6
+    "subcategory": "Galletas y pastas",
+    "price": "5.00€",
+    "description": "La merienda perfecta. Acompaña tu café o té favorito.",
+    "related_count": 8
   },
   {
     "id": "PROD_0003",
-    "name": "Arroz {} kg Premium",
-    "brand": "Doritos",
+    "name": "Pack Ecológico Act Premium",
+    "brand": "Act II",
     "category": "Alimentación",
-    "subcategory": "Snacks dulces",
-    "price": "23€",
-    "related_count": 6
+    "subcategory": "Productos ecológicos",
+    "price": "11€",
+    "description": "Producto ecológico certificado. Cultivado sin pesticidas ni químicos.",
+    "related_count": 8
   },
   {
     "id": "PROD_0004",
-    "name": "Barrita de Cereal {} Ecológico",
-    "brand": "La Piara",
+    "name": "Aliño Mediterráneo Danone Edición Limitada",
+    "brand": "Danone",
     "category": "Alimentación",
-    "subcategory": "Snacks salados",
-    "price": "6.00€",
-    "related_count": 6
+    "subcategory": "Salsas y condimentos",
+    "price": "3.00€",
+    "description": "Salsa artesanal con ingredientes naturales. El toque que lo cambia todo.",
+    "related_count": 8
   },
   {
     "id": "PROD_0005",
-    "name": "Galletas {} {} Familiar",
-    "brand": "Nocilla",
+    "name": "Agua Mineral Oreo Edición Limitada",
+    "brand": "Oreo",
     "category": "Alimentación",
-    "subcategory": "Chocolates",
-    "price": "35€",
-    "related_count": 6
+    "subcategory": "Bebidas",
+    "price": "3.00€",
+    "description": "El sabor original que tanto te gusta, ahora en formato práctico.",
+    "related_count": 8
   }
 ]
